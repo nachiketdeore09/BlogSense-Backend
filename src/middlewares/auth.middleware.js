@@ -1,6 +1,6 @@
-import { asyncHandler } from '../utils/asyncHandler.js';
+import asyncHandler from '../utils/asyncHandler.js';
 import jwt from 'jsonwebtoken';
-import { ApiError } from '../utils/apiError.js';
+import ApiError from '../utils/apiError.js';
 import User from '../models/user.model.js';
 
 const verifyToken = asyncHandler(async (req, res, next) => {
@@ -8,7 +8,7 @@ const verifyToken = asyncHandler(async (req, res, next) => {
         const token =
             req.cookies?.accessToken ||
             req.header('Authorization')?.replace('Bearer ', '');
-
+        
         if (!token) return new ApiError(401, 'Unauthorized access');
         const decodedToken = jwt.decode(token, process.env.ACCESS_TOKEN_SECRET);
 
