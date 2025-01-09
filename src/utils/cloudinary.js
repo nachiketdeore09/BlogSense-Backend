@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs'; // Node.js File system for file operations
+import ApiError from './apiError';
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -10,7 +11,7 @@ cloudinary.config({
 const uploadOnCloudinary = async (localPath) => {
     try {
         if (!localPath) {
-            throw new Error('Local path is required');
+            throw new ApiError(401, "Local path is required")
         }
         const response = await cloudinary.uploader.upload(
             localPath,
