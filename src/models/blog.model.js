@@ -1,5 +1,17 @@
 import mongoose from 'mongoose';
 
+const commnetSchema = mongoose.Schema({
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+    },
+    comment: {
+        type: String,
+        required: true,
+    },
+}, {timestamps: true});
+
 const blogSchema = mongoose.Schema(
     {
         title: {
@@ -10,9 +22,11 @@ const blogSchema = mongoose.Schema(
             type: String,
             required: true,
         },
-        images: {
-            type: String,
-        },
+        images: [
+            {
+                type: String,
+            },
+        ],
         owner: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
@@ -25,10 +39,7 @@ const blogSchema = mongoose.Schema(
             },
         ],
         comments: [
-            {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: 'User',
-            },
+            commnetSchema
         ],
     },
     { timestamps: true },

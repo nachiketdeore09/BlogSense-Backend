@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAllBlogs, createBlog, likeBlog } from '../controllers/blog.controller.js';
+import { getAllBlogs, createBlog, likeBlog, commentBlog } from '../controllers/blog.controller.js';
 import { verifyToken } from '../middlewares/auth.middleware.js';
 import { upload } from '../middlewares/multer.middleware.js';
 
@@ -12,5 +12,6 @@ router.route('/create').post(
         createBlog,
     );
 router.route('/like/:id').post(verifyToken, likeBlog);
+router.route('/comment').post(verifyToken, commentBlog);
 
 export default router;

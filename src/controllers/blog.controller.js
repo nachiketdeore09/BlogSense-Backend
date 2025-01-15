@@ -14,22 +14,28 @@ const getAllBlogs = asyncHandler(async (req, res) => {
 
 const createBlog = asyncHandler(async (req, res) => {
     const { title, description } = req.body;
-    const local_images = ''; //req.files.map((file) => file.path);
     if (!title || !description) {
         return new ApiError(400, 'Title and description are required');
     }
+
     // Upload images to cloudinary
-    // const imageURLs = [];
-    // if (local_images.length > 0) {
-    //     for (const image of local_images) {
-    //         const uploadedImage = await uploadOnCloudinary(image);
-    //         imageURLs.push(uploadedImage.secure_url);
-    //     }
-    // }
+    const imageURLs = [];
+    if (req.files && req.files.images.length > 0) {
+        const local_images = req.files.images;
+        if (local_images.length > 0) {
+            for (const image of local_images) {
+                const uploadedImage = await uploadOnCloudinary(image.path);
+                if (!uploadedImage) {
+                    return new ApiError(500, 'Error uploading image');
+                }
+                imageURLs.push(uploadedImage);
+            }
+        }
+    }
     const blog = await Blog.create({
         title,
         description,
-        images: '',
+        images: imageURLs,
         owner: req.user._id,
     });
 
@@ -47,7 +53,17 @@ const createBlog = asyncHandler(async (req, res) => {
 });
 
 const likeBlog = asyncHandler(async (req, res) => {
-    const blog = await Blog.findById(req.params.id);
+    const id = req.params.id || req.body.id;
+    
+    if (!id) {
+        throw new ApiError(400, 'Blog ID is required'); // Handle missing ID
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new ApiError(400, 'Invalid Blog ID'); // Validate ID format
+    }
+
+    const blog = await Blog.findById(id);
     if (!blog) {
         return new ApiError(404, 'Blog not found');
     }
@@ -60,22 +76,36 @@ const likeBlog = asyncHandler(async (req, res) => {
     await blog.save();
 
     return res.status(200).json(new ApiResponse(200, 'Blog liked', blog));
-})
+});
 
 const commentBlog = asyncHandler(async (req, res) => {
-    const blog = await Blog.findById(req.params.id);
+    if (!req.user) {
+        return new ApiError(401, 'Unauthorized');
+    }
+    const id = req.params.id || req.body.id;
+
+    if (!id) {
+        throw new ApiError(400, 'Blog ID is required'); // Handle missing ID
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new ApiError(400, 'Invalid Blog ID'); // Validate ID format
+    }
+
+    const blog = await Blog.findById(id);
     if (!blog) {
         return new ApiError(404, 'Blog not found');
     }
 
-    if (blog.comments.includes(req.user._id)) {
-        return new ApiError(400, 'You have already commented on this blog');
-    }
+    const { comment } = req.body;
 
-    blog.comments.push(req.user._id);
-    await blog.save();
+    blog.comments.push({
+        user: req.user._id,
+        comment,
+    });
+    await blog.save({ validateBeforeSave: false });
 
     return res.status(200).json(new ApiResponse(200, 'Blog commented', blog));
 });
 
-export { getAllBlogs, createBlog, likeBlog };
+export { getAllBlogs, createBlog, likeBlog, commentBlog };
