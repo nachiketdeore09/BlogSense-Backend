@@ -3,6 +3,7 @@ import Blog from '../models/blog.model.js';
 import ApiError from '../utils/apiError.js';
 import ApiResponse from '../utils/apiResponse.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
+import apiError from '../utils/apiError.js';
 
 const getAllBlogs = asyncHandler(async (req, res) => {
     const blogs = await Blog.find();
@@ -54,13 +55,9 @@ const createBlog = asyncHandler(async (req, res) => {
 
 const likeBlog = asyncHandler(async (req, res) => {
     const id = req.params.id || req.body.id;
-    
+
     if (!id) {
         throw new ApiError(400, 'Blog ID is required'); // Handle missing ID
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        throw new ApiError(400, 'Invalid Blog ID'); // Validate ID format
     }
 
     const blog = await Blog.findById(id);
@@ -73,8 +70,7 @@ const likeBlog = asyncHandler(async (req, res) => {
     }
 
     blog.likes.push(req.user._id);
-    await blog.save();
-
+    await blog.save({ validateBeforeSave: false });
     return res.status(200).json(new ApiResponse(200, 'Blog liked', blog));
 });
 
@@ -82,14 +78,11 @@ const commentBlog = asyncHandler(async (req, res) => {
     if (!req.user) {
         return new ApiError(401, 'Unauthorized');
     }
-    const id = req.params.id || req.body.id;
+
+    const id = req.params.id || req.query.id || req.body.id;
 
     if (!id) {
         throw new ApiError(400, 'Blog ID is required'); // Handle missing ID
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        throw new ApiError(400, 'Invalid Blog ID'); // Validate ID format
     }
 
     const blog = await Blog.findById(id);
@@ -108,4 +101,72 @@ const commentBlog = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, 'Blog commented', blog));
 });
 
-export { getAllBlogs, createBlog, likeBlog, commentBlog };
+const updateBlog = asyncHandler(async (req, res) => {
+    // Update blog code here
+    const id = req.params.id || req.query.id || req.body.id;
+    const { title, description } = req.body;
+
+    if(!title && !description){
+        throw new apiError(400, 'Title or description is required');
+    }
+
+    if (!id) {
+        throw new ApiError(400, 'Blog ID is required');
+    }
+    const blog = await Blog.findById(id);
+    if (!blog) {
+        throw new ApiError(404, 'Blog not found');
+    }
+    if (blog.owner.toString() !== req.user._id.toString()) {
+        throw new ApiError(403, 'Unauthorized access');
+    }
+    if (title) {
+        blog.title = title;
+    }
+    if (description) {
+        blog.description = description || blog.description;
+    }
+    await blog.save({ validateBeforeSave: false });
+    return res.status(200).json(new ApiResponse(200, 'Blog updated', blog));
+});
+
+const deleteBlog = asyncHandler(async (req, res) => {
+    const id = req.params.id || req.query.id || req.body.id;
+    if (!id) {
+        throw new ApiError(400, 'Blog ID is required');
+    }
+    const blog = await Blog.findById(id);
+    if (!blog) {
+        return new ApiError(404, 'Blog not found');
+    }
+
+    if (blog.owner.toString() !== req.user._id.toString()) {
+        throw new ApiError(403, 'Unauthorized access');
+    }
+    const deleteRes = await Blog.findByIdAndDelete(id);
+    return res
+        .status(200)
+        .json(new ApiResponse(200, 'Blog deleted', deleteRes));
+});
+
+//get user's all blogs
+const getUserBlogs = asyncHandler(async (req, res) => {
+    if (!req.user) {
+        return new ApiError(401, 'Unauthorized');
+    }
+    const blogs = await Blog.find({ owner: req.user._id });
+    if (!blogs) {
+        return new ApiError(404, 'No blogs found');
+    }
+    return res.status(200).json(new ApiResponse(200, 'Blogs found', blogs));
+});
+
+export {
+    getAllBlogs,
+    createBlog,
+    likeBlog,
+    commentBlog,
+    updateBlog,
+    deleteBlog,
+    getUserBlogs,
+};
