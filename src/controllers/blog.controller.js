@@ -4,6 +4,15 @@ import ApiError from '../utils/apiError.js';
 import ApiResponse from '../utils/apiResponse.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import apiError from '../utils/apiError.js';
+import langflowClient from '../utils/langflow.js';
+import { DataAPIClient } from '@datastax/astra-db-ts';
+
+// Initialize the client
+const client = new DataAPIClient(process.env.ASTRA_DB_TOKEN);
+
+const db = client.db(
+    'https://d178fedd-0a5d-4640-9067-af8f29002fb9-us-east-2.apps.astra.datastax.com',
+);
 
 const getAllBlogs = asyncHandler(async (req, res) => {
     const blogs = await Blog.find();
@@ -33,24 +42,17 @@ const createBlog = asyncHandler(async (req, res) => {
             }
         }
     }
-    const blog = await Blog.create({
+
+    const document = {
+        $vectorize: description,
         title,
-        description,
         images: imageURLs,
-        owner: req.user._id,
-    });
+    };
 
-    const createdBlog = await Blog.findById(blog._id).populate(
-        'owner',
-        'username email',
-    );
-    if (!createdBlog) {
-        return new ApiError(500, 'Error creating blog');
-    }
+    const blog = await db.collection('blog');
+    const result = await blog.insertOne(document);
 
-    return res
-        .status(201)
-        .json(new ApiResponse(201, 'Blog created', createdBlog));
+    return res.status(201).json(new ApiResponse(201, 'Blog created', result));
 });
 
 const likeBlog = asyncHandler(async (req, res) => {
@@ -106,7 +108,7 @@ const updateBlog = asyncHandler(async (req, res) => {
     const id = req.params.id || req.query.id || req.body.id;
     const { title, description } = req.body;
 
-    if(!title && !description){
+    if (!title && !description) {
         throw new apiError(400, 'Title or description is required');
     }
 
@@ -161,6 +163,48 @@ const getUserBlogs = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, 'Blogs found', blogs));
 });
 
+const askQuestion = asyncHandler(async (req, res) => {
+    const { question } = req.body;
+    // initiate session with langflow
+    const flowId = process.env.FLOWID;
+    const langflowId = process.env.LANGFLOW_ID;
+    if (!question || !flowId || !langflowId) {
+        return res.status(400).json({
+            error: 'Missing required fields: message, flowId, or langflowId',
+        });
+    }
+
+    try {
+        const tweaks = {
+            'ChatInput-ivyVt': {},
+            'Prompt-lpeoJ': {},
+            'ChatOutput-eV0ob': {},
+            'OpenAIModel-SzTnW': {},
+        };
+
+        const data = await langflowClient.runFlow(
+            flowId,
+            langflowId,
+            question,
+            'chat', // inputType
+            'chat', // outputTypedata
+            tweaks,
+        );
+        // console.log(data);
+        const outputs =
+            data?.outputs?.[0]?.outputs?.[0]?.results?.message?.text;
+
+        res.status(200).json(
+            new ApiResponse(200, outputs, 'Answer to the question'),
+        );
+    } catch (error) {
+        console.error('Error asking question:', error);
+        res.status(500).json({
+            error: 'Error asking question',
+        });
+    }
+});
+
 export {
     getAllBlogs,
     createBlog,
@@ -169,4 +213,5 @@ export {
     updateBlog,
     deleteBlog,
     getUserBlogs,
+    askQuestion,
 };

@@ -10,12 +10,24 @@ import { verifyToken } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
-router.route('/users').post(verifyToken,getUsers);
+router.route('/users').post(verifyToken, getUsers);
 
-router.route('/register').post(upload.fields([{name: "avatar"}]), registerUser);
+router
+    .route('/register')
+    .post(upload.fields([{ name: 'avatar' }]), registerUser);
 
 router.route('/login').post(loginUser);
 
 router.route('/logout').post(verifyToken, logOutUser);
+
+router.route('/isAuthenticated').get(verifyToken, (req, res) => {
+    if(!req.user) {
+        return res.status(401).json({ success: false, message: 'User is not authenticated' });
+    }
+    
+    return res
+        .status(200)
+        .json({ success: true, message: 'User is authenticated' });
+});
 
 export default router;
