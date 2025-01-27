@@ -7,7 +7,7 @@ export const db = client.db(
 );
 
 const connectAstraDB = async () => {
-    const colls = await db.collection('blog');
+    const colls = db.collection('blog');
     console.log('Connected to AstraDB:', colls['collectionName']);
 };
 

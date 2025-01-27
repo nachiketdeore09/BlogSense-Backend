@@ -47,12 +47,35 @@ const createBlog = asyncHandler(async (req, res) => {
         $vectorize: description,
         title,
         images: imageURLs,
+        owner: req.user._id,
+        metadata: {
+            category: 'General', // Add default metadata if missing
+            author:  'Unknown',
+            created_at: new Date().toISOString(),
+        },
     };
 
-    const blog = await db.collection('blog');
+    const blog = db.collection('blog');
     const result = await blog.insertOne(document);
 
-    return res.status(201).json(new ApiResponse(201, 'Blog created', result));
+    const blogOnMongo = await Blog.create({
+        title,
+        description,
+        images: imageURLs,
+        owner: req.user._id,
+    });
+
+    const createdBlog = await Blog.findById(blogOnMongo._id).populate(
+        'owner',
+        'username email',
+    );
+    if (!createdBlog) {
+        return new ApiError(500, 'Error creating blog');
+    }
+
+    return res
+        .status(201)
+        .json(new ApiResponse(201, 'Blog created', createdBlog));
 });
 
 const likeBlog = asyncHandler(async (req, res) => {
