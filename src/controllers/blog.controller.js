@@ -6,9 +6,12 @@ import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import apiError from '../utils/apiError.js';
 import langflowClient from '../utils/langflow.js';
 import { DataAPIClient } from '@datastax/astra-db-ts';
+import OpenAI from 'openai';
 
 // Initialize the client
 const client = new DataAPIClient(process.env.ASTRA_DB_TOKEN);
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const db = client.db(
     'https://d178fedd-0a5d-4640-9067-af8f29002fb9-us-east-2.apps.astra.datastax.com',
@@ -50,7 +53,7 @@ const createBlog = asyncHandler(async (req, res) => {
         owner: req.user._id,
         metadata: {
             category: 'General', // Add default metadata if missing
-            author:  'Unknown',
+            author: 'Unknown',
             created_at: new Date().toISOString(),
         },
     };
@@ -186,46 +189,61 @@ const getUserBlogs = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, 'Blogs found', blogs));
 });
 
+const setBlog = asyncHandler(async (req, res) => {
+    const id = req.params.id;
+
+    if (!id) {
+        return new ApiError(
+            400,
+            'Please select an article to ask questions on it',
+        );
+    }
+
+    const blog = await Blog.findById({ _id: id });
+    if (!blog) {
+        return new ApiError(400, 'No blogs found.');
+    }
+    const description = blog['description'];
+    req.session.blog = description;
+
+    return res.status(200).json(new ApiResponse(200, blog));
+});
+
 const askQuestion = asyncHandler(async (req, res) => {
     const { question } = req.body;
-    // initiate session with langflow
-    const flowId = process.env.FLOWID;
-    const langflowId = process.env.LANGFLOW_ID;
-    if (!question || !flowId || !langflowId) {
-        return res.status(400).json({
-            error: 'Missing required fields: message, flowId, or langflowId',
-        });
+    // console.log(req.session.blog)
+    if (!req.session.blog) {
+        return res
+            .status(400)
+            .json({
+                error: 'No article selected. Please select an article first.',
+            });
     }
 
-    try {
-        const tweaks = {
-            'ChatInput-ivyVt': {},
-            'Prompt-lpeoJ': {},
-            'ChatOutput-eV0ob': {},
-            'OpenAIModel-SzTnW': {},
-        };
+    const articleContent = req.session.blog;
 
-        const data = await langflowClient.runFlow(
-            flowId,
-            langflowId,
-            question,
-            'chat', // inputType
-            'chat', // outputTypedata
-            tweaks,
-        );
-        // console.log(data);
-        const outputs =
-            data?.outputs?.[0]?.outputs?.[0]?.results?.message?.text;
-
-        res.status(200).json(
-            new ApiResponse(200, outputs, 'Answer to the question'),
-        );
-    } catch (error) {
-        console.error('Error asking question:', error);
-        res.status(500).json({
-            error: 'Error asking question',
-        });
+    // Query OpenAI with article as context
+    const aiResponse = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+            {
+                role: 'system',
+                content:
+                    "You are an assistant that answers questions strictly based on the provided article. If the answer is not in the article, say 'I don't know'.",
+            },
+            {
+                role: 'user',
+                content: `Article: ${articleContent} \n\nQuestion: ${question}`,
+            },
+        ],
+        max_tokens: 300,
+    });
+    console.log(aiResponse);
+    if(!aiResponse){
+        return new ApiError(400, 'Error asking question');
     }
+
+    return res.status(200).json(new ApiResponse(200, aiResponse.data.choices[0].message.content));
 });
 
 export {
@@ -237,4 +255,5 @@ export {
     deleteBlog,
     getUserBlogs,
     askQuestion,
+    setBlog,
 };
