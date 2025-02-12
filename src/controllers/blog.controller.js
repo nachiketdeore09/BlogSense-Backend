@@ -52,7 +52,7 @@ const createBlog = asyncHandler(async (req, res) => {
         return new ApiError(500, 'Error creating blog');
     }
 
-    const embedding = await generateEmbedding([description]);
+    const embedding = await generateEmbedding(`${title}. ${description}`);
 
 
     await index.upsert([
@@ -231,7 +231,7 @@ const getContext = async (question) => {
 const askQuestion = asyncHandler(async (req, res) => {
     const { question } = req.body;
 
-    const context = getContext(question);
+    const context = await getContext(question);
 
     const aiResponse = await generateAnswer(context, question);
     if (!aiResponse) {
@@ -240,7 +240,7 @@ const askQuestion = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .json(new ApiResponse(200, aiResponse.data.choices[0].message.content));
+        .json(new ApiResponse(200, aiResponse));
 });
 
 export {

@@ -16,6 +16,8 @@ const generateAnswer = async (context, question) => {
         ],
     });
 
+    console.log(response)
+
     return response.message.content;
 };
 

@@ -10,8 +10,8 @@ const pinecone = new Pinecone({
 const index = pinecone.index(process.env.PINECONE_INDEX_NAME);
 const model = 'multilingual-e5-large';
 
-async function generateEmbedding(title, content) {
-    const text = [`${title}. ${content}`];
+async function generateEmbedding(content) {
+    const text = [content];
     const embeddings = await pinecone.inference.embed(
         model,
         text,
