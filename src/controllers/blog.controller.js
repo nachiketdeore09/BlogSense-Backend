@@ -4,18 +4,8 @@ import ApiError from '../utils/apiError.js';
 import ApiResponse from '../utils/apiResponse.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import apiError from '../utils/apiError.js';
-import langflowClient from '../utils/langflow.js';
-import { DataAPIClient } from '@datastax/astra-db-ts';
-import OpenAI from 'openai';
-
-// Initialize the client
-const client = new DataAPIClient(process.env.ASTRA_DB_TOKEN);
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-const db = client.db(
-    'https://d178fedd-0a5d-4640-9067-af8f29002fb9-us-east-2.apps.astra.datastax.com',
-);
+import { index, generateEmbedding } from '../db/pinecone.js';
+import generateAnswer from '../utils/generateAnswer.js';
 
 const getAllBlogs = asyncHandler(async (req, res) => {
     const blogs = await Blog.find();
@@ -46,21 +36,6 @@ const createBlog = asyncHandler(async (req, res) => {
         }
     }
 
-    const document = {
-        $vectorize: description,
-        title,
-        images: imageURLs,
-        owner: req.user._id,
-        metadata: {
-            category: 'General', // Add default metadata if missing
-            author: 'Unknown',
-            created_at: new Date().toISOString(),
-        },
-    };
-
-    const blog = db.collection('blog');
-    const result = await blog.insertOne(document);
-
     const blogOnMongo = await Blog.create({
         title,
         description,
@@ -72,9 +47,25 @@ const createBlog = asyncHandler(async (req, res) => {
         'owner',
         'username email',
     );
+
     if (!createdBlog) {
         return new ApiError(500, 'Error creating blog');
     }
+
+    const embedding = await generateEmbedding(`${title}. ${description}`);
+
+
+    await index.upsert([
+        {
+            id: createdBlog._id,
+            values: embedding,
+            metadata: {
+                title: title,
+                description: description,
+            },
+        },
+    ]);
+
 
     return res
         .status(201)
@@ -154,6 +145,27 @@ const updateBlog = asyncHandler(async (req, res) => {
     if (description) {
         blog.description = description || blog.description;
     }
+
+    // Delete the old blog from Pinecone
+    await index.delete({ id: blog._id });
+
+    // Create a new embedding for the updated blog
+    const embedding = await generateEmbedding(description);
+
+    // Upsert the new blog into Pinecone
+    const upsertRes = await index.upsert({
+        id: blog._id,
+        values: embedding,
+        metadata: {
+            title: title,
+            description: description,
+        },
+    });
+
+    if (!upsertRes) {
+        return new ApiError(500, 'Error upserting blog');
+    }
+
     await blog.save({ validateBeforeSave: false });
     return res.status(200).json(new ApiResponse(200, 'Blog updated', blog));
 });
@@ -171,7 +183,14 @@ const deleteBlog = asyncHandler(async (req, res) => {
     if (blog.owner.toString() !== req.user._id.toString()) {
         throw new ApiError(403, 'Unauthorized access');
     }
+
     const deleteRes = await Blog.findByIdAndDelete(id);
+    if (!deleteRes) {
+        return new ApiError(500, 'Error deleting blog');
+    }
+
+    await index.delete({ id: id });
+
     return res
         .status(200)
         .json(new ApiResponse(200, 'Blog deleted', deleteRes));
@@ -189,61 +208,39 @@ const getUserBlogs = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, 'Blogs found', blogs));
 });
 
-const setBlog = asyncHandler(async (req, res) => {
-    const id = req.params.id;
-
-    if (!id) {
-        return new ApiError(
-            400,
-            'Please select an article to ask questions on it',
-        );
+const getContext = async (question) => {
+    const embedding = await generateEmbedding(question);
+    const queryResult = await index.query({
+        vector: embedding,
+        topK: 5, // Retrieve top 5 most relevant blogs
+        includeMetadata: true,
+    });
+    if (!queryResult) {
+        return new ApiError(400, 'Error getting context');
     }
 
-    const blog = await Blog.findById({ _id: id });
-    if (!blog) {
-        return new ApiError(400, 'No blogs found.');
+    const context = queryResult.matches.map(
+        (match) => match.metadata.description,
+    );
+    if (!context) {
+        return new ApiError(400, 'Error getting context');
     }
-    const description = blog['description'];
-    req.session.blog = description;
-
-    return res.status(200).json(new ApiResponse(200, blog));
-});
+    return context.join('\n');
+};
 
 const askQuestion = asyncHandler(async (req, res) => {
     const { question } = req.body;
-    // console.log(req.session.blog)
-    if (!req.session.blog) {
-        return res
-            .status(400)
-            .json({
-                error: 'No article selected. Please select an article first.',
-            });
-    }
 
-    const articleContent = req.session.blog;
+    const context = await getContext(question);
 
-    // Query OpenAI with article as context
-    const aiResponse = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-            {
-                role: 'system',
-                content:
-                    "You are an assistant that answers questions strictly based on the provided article. If the answer is not in the article, say 'I don't know'.",
-            },
-            {
-                role: 'user',
-                content: `Article: ${articleContent} \n\nQuestion: ${question}`,
-            },
-        ],
-        max_tokens: 300,
-    });
-    console.log(aiResponse);
-    if(!aiResponse){
+    const aiResponse = await generateAnswer(context, question);
+    if (!aiResponse) {
         return new ApiError(400, 'Error asking question');
     }
 
-    return res.status(200).json(new ApiResponse(200, aiResponse.data.choices[0].message.content));
+    return res
+        .status(200)
+        .json(new ApiResponse(200, aiResponse));
 });
 
 export {
@@ -255,5 +252,5 @@ export {
     deleteBlog,
     getUserBlogs,
     askQuestion,
-    setBlog,
+    getContext,
 };
