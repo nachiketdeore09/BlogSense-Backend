@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const commnetSchema = mongoose.Schema({
+const commentSchema = mongoose.Schema({
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -39,7 +39,7 @@ const blogSchema = mongoose.Schema(
             },
         ],
         comments: [
-            commnetSchema
+            commentSchema
         ],
     },
     { timestamps: true },

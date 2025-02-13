@@ -5,10 +5,12 @@ import ApiResponse from '../utils/apiResponse.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import apiError from '../utils/apiError.js';
 import { index, generateEmbedding } from '../db/pinecone.js';
+import mongoose from 'mongoose';
 import generateAnswer from '../utils/generateAnswer.js';
 
 const getAllBlogs = asyncHandler(async (req, res) => {
-    const blogs = await Blog.find();
+    // Get only title and description
+    const blogs = await Blog.find().select('title description');
     if (!blogs) {
         return new ApiError(404, 'No blogs found');
     }
@@ -54,7 +56,6 @@ const createBlog = asyncHandler(async (req, res) => {
 
     const embedding = await generateEmbedding(`${title}. ${description}`);
 
-
     await index.upsert([
         {
             id: createdBlog._id,
@@ -66,7 +67,6 @@ const createBlog = asyncHandler(async (req, res) => {
         },
     ]);
 
-
     return res
         .status(201)
         .json(new ApiResponse(201, 'Blog created', createdBlog));
@@ -76,16 +76,25 @@ const likeBlog = asyncHandler(async (req, res) => {
     const id = req.params.id || req.body.id;
 
     if (!id) {
-        throw new ApiError(400, 'Blog ID is required'); // Handle missing ID
+        throw new ApiError(400, 'Blog ID is required');
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new ApiError(400, 'Invalid blog ID format');
     }
 
     const blog = await Blog.findById(id);
+
+
     if (!blog) {
-        return new ApiError(404, 'Blog not found');
+        throw new ApiError(404, 'Blog not found');
     }
 
     if (blog.likes.includes(req.user._id)) {
-        return new ApiError(400, 'You have already liked this blog');
+        // remove the like
+        blog.likes = blog.likes.filter((like) => like.toString() !== req.user._id.toString());
+        await blog.save({ validateBeforeSave: false });
+        return res.status(200).json(new ApiResponse(200, 'Blog unliked', blog));
     }
 
     blog.likes.push(req.user._id);
@@ -147,13 +156,10 @@ const updateBlog = asyncHandler(async (req, res) => {
     }
 
     // Delete the old blog from Pinecone
-    await index.delete({ id: blog._id });
-
-    // Create a new embedding for the updated blog
+    // await index.delete({ id: blog._id });
     const embedding = await generateEmbedding(description);
 
-    // Upsert the new blog into Pinecone
-    const upsertRes = await index.upsert({
+    await index.update({
         id: blog._id,
         values: embedding,
         metadata: {
@@ -161,10 +167,6 @@ const updateBlog = asyncHandler(async (req, res) => {
             description: description,
         },
     });
-
-    if (!upsertRes) {
-        return new ApiError(500, 'Error upserting blog');
-    }
 
     await blog.save({ validateBeforeSave: false });
     return res.status(200).json(new ApiResponse(200, 'Blog updated', blog));
@@ -189,11 +191,9 @@ const deleteBlog = asyncHandler(async (req, res) => {
         return new ApiError(500, 'Error deleting blog');
     }
 
-    await index.delete({ id: id });
+    const r = await index.deleteOne('67acba7e9518f7ac7ef203db');
 
-    return res
-        .status(200)
-        .json(new ApiResponse(200, 'Blog deleted', deleteRes));
+    return res.status(200).json(new ApiResponse(200, 'Blog deleted', r));
 });
 
 //get user's all blogs
@@ -238,9 +238,7 @@ const askQuestion = asyncHandler(async (req, res) => {
         return new ApiError(400, 'Error asking question');
     }
 
-    return res
-        .status(200)
-        .json(new ApiResponse(200, aiResponse));
+    return res.status(200).json(new ApiResponse(200, 'aiResponse'));
 });
 
 export {
