@@ -23,7 +23,7 @@ const createBlog = asyncHandler(async (req, res) => {
         return new ApiError(400, 'Title and description are required');
     }
 
-    // Upload images to cloudinary 
+    // Upload images to cloudinary
     const imageURLs = [];
     if (req.files && req.files.images.length > 0) {
         const local_images = req.files.images;
