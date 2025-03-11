@@ -209,36 +209,53 @@ const getUserBlogs = asyncHandler(async (req, res) => {
 });
 
 const getContext = async (question) => {
-    const embedding = await generateEmbedding(question);
-    const queryResult = await index.query({
-        vector: embedding,
-        topK: 5, // Retrieve top 5 most relevant blogs
-        includeMetadata: true,
-    });
-    if (!queryResult) {
-        return new ApiError(400, 'Error getting context');
-    }
+    try {
+        const embedding = await generateEmbedding(question);
+        const queryResult = await index.query({
+            vector: embedding,
+            topK: 5, // Retrieve top 5 most relevant blogs
+            includeMetadata: true,
+        });
 
-    const context = queryResult.matches.map(
-        (match) => match.metadata.description,
-    );
-    if (!context) {
-        return new ApiError(400, 'Error getting context');
+        if (!queryResult || !queryResult.matches) {
+            throw new ApiError(400, 'Error getting context');
+        }
+
+        // Filter matches with a similarity score >= 0.75
+        const filteredMatches = queryResult.matches.filter(
+            (match) => match.score >= 0.75,
+        );
+
+        // Extract descriptions from filtered matches
+        const context = filteredMatches.map(
+            (match) => match.metadata.description,
+        );
+
+        if (context.length === 0) {
+            throw new ApiError(400, 'No relevant context found');
+        }
+
+        return context.join('\n');
+    } catch (error) {
+        throw new ApiError(500, `Error retrieving context: ${error.message}`);
     }
-    return context.join('\n');
 };
+
 
 const askQuestion = asyncHandler(async (req, res) => {
     const { question } = req.body;
 
     const context = await getContext(question);
-
+    // console.log(context);
+    if (!context) {
+        return new ApiError(400, 'Error getting context');
+    }
     const aiResponse = await generateAnswer(context, question);
     if (!aiResponse) {
         return new ApiError(400, 'Error asking question');
     }
-
-    return res.status(200).json(new ApiResponse(200, 'aiResponse'));
+    
+    return res.status(200).json(new ApiResponse(200, "Response generated",aiResponse));
 });
 
 export {
