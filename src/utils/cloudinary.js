@@ -11,7 +11,7 @@ cloudinary.config({
 const uploadOnCloudinary = async (localPath) => {
     try {
         if (!localPath) {
-            throw new ApiError(401, "Local path is required")
+            throw new apiError(401, "Local path is required")
         }
         const response = await cloudinary.uploader.upload(
             localPath,
