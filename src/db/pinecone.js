@@ -7,6 +7,10 @@ const pinecone = new Pinecone({
     apiKey: process.env.PINECONE_API_KEY,
 });
 
+if (!process.env.PINECONE_INDEX_NAME) {
+    throw new Error("PINECONE_INDEX_NAME is not set in environment variables");
+}
+
 const index = pinecone.index(process.env.PINECONE_INDEX_NAME);
 const model = 'multilingual-e5-large';
 

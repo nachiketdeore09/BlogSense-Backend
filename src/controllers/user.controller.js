@@ -2,7 +2,7 @@ import User from '../models/user.model.js';
 import ApiError from '../utils/apiError.js';
 import ApiResponse from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import {uploadOnCloudinary} from '../utils/cloudinary.js';
+import { uploadOnCloudinary } from '../utils/cloudinary.js';
 
 const generateAccessAndRefreshToken = async (userId) => {
     try {
@@ -21,8 +21,9 @@ const generateAccessAndRefreshToken = async (userId) => {
     }
 };
 
+//to get all the users resigtered in the system
 const getUsers = asyncHandler(async (req, res) => {
-    
+
     const users = await User.find().select('-password -refreshToken');
     if (!users) {
         throw new ApiError(404, 'No users found');
@@ -45,10 +46,10 @@ const registerUser = asyncHandler(async (req, res) => {
 
     let avatarLocalPath = null;
     if (req.files && req.files.avatar && req.files.avatar.length > 0) {
-        avatarLocalPath = req.files.avatar[0].path;
+        avatarLocalPath = req.files.avatar[0]?.path;
     }
 
-    if (avatarLocalPath==null) {
+    if (avatarLocalPath == null) {
         throw new ApiError(400, 'Please provide an avatar !');
     }
 
@@ -121,12 +122,12 @@ const loginUser = asyncHandler(async (req, res) => {
         .status(200)
         .cookie('refreshToken', refreshToken, options)
         .cookie('accessToken', accessToken, options)
-        .json(new ApiResponse(200, 'User logged in successfully', {user: newUser, accessToken, refreshToken}));
+        .json(new ApiResponse(200, 'User logged in successfully', { user: newUser, accessToken, refreshToken }));
 });
 
 const logOutUser = asyncHandler(async (req, res) => {
     // console.log(req.user);
-    if(!req.user){
+    if (!req.user) {
         throw new ApiError(401, 'Unauthorized');
     }
     await User.findByIdAndUpdate(

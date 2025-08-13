@@ -6,7 +6,7 @@ import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import apiError from '../utils/apiError.js';
 import { index, generateEmbedding } from '../db/pinecone.js';
 import mongoose from 'mongoose';
-import generateAnswer from '../utils/generateAnswer.js';
+import { generateAnswer, enhanceBlog, summarizeBlog } from '../utils/generateAnswer.js';
 
 const getAllBlogs = asyncHandler(async (req, res) => {
     // Get only title and description
@@ -152,23 +152,24 @@ const updateBlog = asyncHandler(async (req, res) => {
         blog.title = title;
     }
     if (description) {
-        blog.description = description || blog.description;
+        blog.description = description;
+        const embedding = await generateEmbedding(description);
+
+        await index.update({
+            id: blog._id,
+            values: embedding,
+            metadata: {
+                title: title,
+                description: description,
+            },
+        });
+
+        await blog.save({ validateBeforeSave: false });
     }
 
     // Delete the old blog from Pinecone
     // await index.delete({ id: blog._id });
-    const embedding = await generateEmbedding(description);
 
-    await index.update({
-        id: blog._id,
-        values: embedding,
-        metadata: {
-            title: title,
-            description: description,
-        },
-    });
-
-    await blog.save({ validateBeforeSave: false });
     return res.status(200).json(new ApiResponse(200, 'Blog updated', blog));
 });
 
@@ -190,10 +191,13 @@ const deleteBlog = asyncHandler(async (req, res) => {
     if (!deleteRes) {
         return new ApiError(500, 'Error deleting blog');
     }
-
-    const r = await index.deleteOne('67acba7e9518f7ac7ef203db');
-
-    return res.status(200).json(new ApiResponse(200, 'Blog deleted', r));
+    // console.log(id);
+    await index.deleteOne(id);
+    // if (!r) {
+    //     return new ApiError(500, 'Error deleting blog from Pinecone');
+    // }
+    // console.log(r);
+    return res.status(200).json(new ApiResponse(200, 'Blog deleted', deleteRes));
 });
 
 //get user's all blogs
@@ -254,9 +258,27 @@ const askQuestion = asyncHandler(async (req, res) => {
     if (!aiResponse) {
         return new ApiError(400, 'Error asking question');
     }
-    
-    return res.status(200).json(new ApiResponse(200, "Response generated",aiResponse));
+
+    return res.status(200).json(new ApiResponse(200, "Response generated", aiResponse));
 });
+
+//function to enhance given blog text
+const improveBlog = asyncHandler(async (req, res) => {
+    const { blogText } = req.body;
+
+    if (!blogText) {
+        return new ApiError(400, 'Blog text is required for enhancement');
+    }
+
+    const enhancedText = await enhanceBlog(blogText);
+    if (!enhancedText) {
+        return new ApiError(500, 'Error enhancing blog');
+    }
+
+    return res.status(200).json(new ApiResponse(200, 'Blog enhanced', enhancedText));
+});
+
+
 
 export {
     getAllBlogs,
@@ -268,4 +290,5 @@ export {
     getUserBlogs,
     askQuestion,
     getContext,
+    improveBlog
 };

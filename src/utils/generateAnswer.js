@@ -29,4 +29,55 @@ const generateAnswer = async (context, question) => {
     return result.response.text();
 };
 
-export default generateAnswer;
+const enhanceBlog = async (blogText) => {
+    const prompt = `
+        You are an expert content editor and writer.
+        Your task: Take the given blog text and return ONLY an improved version.
+        Rules:
+        - Keep all facts and meaning exactly the same.
+        - Improve grammar, clarity, vocabulary, and flow.
+        - Output must be a single continuous paragraph.
+        - Do NOT explain your changes.
+        - Do NOT list errors, suggestions, or bullet points.
+        - Do NOT provide alternative versions.
+        - Your ENTIRE output should be the improved blog text only.
+
+
+        Blog text:
+        "${blogText}"
+        `;
+
+    const result = await model.generateContent({
+        contents: [
+            {
+                role: 'user',
+                parts: [
+                    {
+                        text: prompt,
+                    },
+                ],
+            },
+        ],
+        generationConfig: {
+            temperature: 0.4, // Lower temperature for more consistent, accurate edits
+        },
+    });
+    // console.log(result.response.text());
+
+    return result.response.text();
+};
+
+
+
+//TODOS:
+// 1. langraph agent for genrate response
+// 2. Web search automation
+// 3. Blog Copilot
+// 4. frontend integration
+// 5. Get_id route for blog
+// 6. AI-powered Blog Summarization
+// 7. AI-generated Images for Blogs :
+//   Integrate DALL·E or Stable Diffusion to generate blog cover images based on the blog’s content.
+//   Perfect for users who don’t have their own graphics.
+
+export { generateAnswer, enhanceBlog, summarizeBlog };
