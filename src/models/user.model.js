@@ -33,6 +33,18 @@ const userSchema = mongoose.Schema(
             required: true,
             trim: true,
         },
+        followers: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            }
+        ],
+        following: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            }
+        ],
         avatar: {
             type: String,
             required: true,
@@ -58,7 +70,7 @@ userSchema.methods.generateAccessToken = async function () {
     return jwt.sign(
         //Payload
         {
-            _id : this._id,
+            _id: this._id,
             username: this.username,
             email: this.email,
         },
@@ -68,7 +80,7 @@ userSchema.methods.generateAccessToken = async function () {
         {
             expiresIn: process.env.ACCESS_TOKEN_EXPIRY
         }
-        
+
     )
 };
 

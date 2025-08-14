@@ -4,6 +4,8 @@ import {
     registerUser,
     loginUser,
     logOutUser,
+    getUserDetails,
+    followUser
 } from '../controllers/user.controller.js';
 import { upload } from '../middlewares/multer.middleware.js';
 import { verifyToken } from '../middlewares/auth.middleware.js';
@@ -21,13 +23,16 @@ router.route('/login').post(loginUser);
 router.route('/logout').post(verifyToken, logOutUser);
 
 router.route('/isAuthenticated').get(verifyToken, (req, res) => {
-    if(!req.user) {
+    if (!req.user) {
         return res.status(401).json({ success: false, message: 'User is not authenticated' });
     }
-    
+
     return res
         .status(200)
         .json({ success: true, message: 'User is authenticated' });
 });
+
+router.route('/getUserDetails').get(verifyToken, getUserDetails);
+router.route('/followUser').post(verifyToken, followUser);
 
 export default router;

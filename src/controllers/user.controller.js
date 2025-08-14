@@ -1,4 +1,5 @@
 import User from '../models/user.model.js';
+import apiError from '../utils/apiError.js';
 import ApiError from '../utils/apiError.js';
 import ApiResponse from '../utils/apiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
@@ -30,6 +31,23 @@ const getUsers = asyncHandler(async (req, res) => {
     }
     return res.status(200).json(new ApiResponse(200, 'Users found', users));
 });
+
+const getUserDetails = asyncHandler(async (req, res) => {
+    const { user_id } = req.body || req.params;
+
+    if (!user_id) {
+        throw new apiError("please pass a valid Id");
+    }
+
+    const user = await User.findById(user_id);
+    console.log("done")
+    if (!user) {
+        throw new apiError("User not found");
+    }
+    return res
+        .status(201)
+        .json(new ApiResponse(201, 'User fetched', user));
+})
 
 const registerUser = asyncHandler(async (req, res) => {
     const { username, password, fullname, email, gender } = req.body;
@@ -157,9 +175,36 @@ const logOutUser = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, {}, 'User logged out successfully'));
 });
 
+const followUser = asyncHandler(async (req, res) => {
+    const { wantToFollowId } = req.body;
+    if (!wantToFollowId) {
+        throw new apiError("need to be valid user to follow");
+    }
+
+    const wantToFollowUser = await User.findById(wantToFollowId);
+    if (!wantToFollowUser) {
+        throw new apiError("User not found");
+    }
+
+    req.user.following.push(wantToFollowUser);
+    wantToFollowUser.followers.push(req.user);
+
+    await req.user.save({ validateBeforeSave: false });
+    await wantToFollowUser.save({ validateBeforeSave: false });
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, {}, "successfully following"));
+})
+
 export {
     getUsers,
     registerUser,
     loginUser,
     logOutUser,
+    getUserDetails,
+    followUser
 };
+
+// store the blogs created by a user to its model.
+// write a contorller to get all blogs created by any user.

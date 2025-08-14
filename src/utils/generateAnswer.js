@@ -103,10 +103,12 @@ const briefTheBlog = async (blogtext) => {
 // 2. Web search automation
 // 3. Blog Copilot
 // 4. frontend integration
-// 5. Get_id route for blog
+// 5. Get_id route for blog - iska work bhul gaya
 // 6. AI-powered Blog Summarization
 // 7. AI-generated Images for Blogs :
 //   Integrate DALL·E or Stable Diffusion to generate blog cover images based on the blog’s content.
 //   Perfect for users who don’t have their own graphics.
+// 8. Create a follow functionality by which user can follow each other .
+// 9. Create a Feed system so that users can receieve the blogs of other users that they follow.
 
 export { generateAnswer, enhanceBlog, briefTheBlog };
