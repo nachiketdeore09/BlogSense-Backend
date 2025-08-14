@@ -6,7 +6,7 @@ import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import apiError from '../utils/apiError.js';
 import { index, generateEmbedding } from '../db/pinecone.js';
 import mongoose from 'mongoose';
-import { generateAnswer, enhanceBlog, summarizeBlog } from '../utils/generateAnswer.js';
+import { generateAnswer, enhanceBlog, briefTheBlog } from '../utils/generateAnswer.js';
 
 const getAllBlogs = asyncHandler(async (req, res) => {
     // Get only title and description
@@ -262,7 +262,7 @@ const askQuestion = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, "Response generated", aiResponse));
 });
 
-//function to enhance given blog text
+//controller to enhance given blog text
 const improveBlog = asyncHandler(async (req, res) => {
     const { blogText } = req.body;
 
@@ -278,7 +278,20 @@ const improveBlog = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, 'Blog enhanced', enhancedText));
 });
 
+//controller to summarize given blog text
+const summarizeBlog = asyncHandler(async (req, res) => {
+    const { blogText } = req.body;
+    if (!blogText) {
+        return new ApiError(400, 'Blog text is required for enhancement');
+    }
 
+    const blogSummary = await briefTheBlog(blogText);
+
+    if (!blogSummary) {
+        return new ApiError(500, 'Error enhancing blog');
+    }
+    return res.status(200).json(new ApiResponse(200, 'Blog summarised', blogSummary));
+})
 
 export {
     getAllBlogs,
@@ -290,5 +303,6 @@ export {
     getUserBlogs,
     askQuestion,
     getContext,
-    improveBlog
+    improveBlog,
+    summarizeBlog
 };

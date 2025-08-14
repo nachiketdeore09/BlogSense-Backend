@@ -67,6 +67,35 @@ const enhanceBlog = async (blogText) => {
     return result.response.text();
 };
 
+const briefTheBlog = async (blogtext) => {
+    const prompt = `
+        You are an expert content summarizer. Your task is to read the following blog text and produce a concise, accurate summary that preserves all key points while removing unnecessary details. 
+        Write the summary in clear, engaging natural language suitable for a general audience. 
+        Do not add any opinions, interpretations, or unrelated information. 
+        Keep the summary between 3 to 5 sentences and present it as a single cohesive paragraph.
+
+        Blog content:
+        ${blogtext}
+    `
+    const result = await model.generateContent({
+        contents: [
+            {
+                role: 'user',
+                parts: [
+                    {
+                        text: prompt,
+                    },
+                ],
+            },
+        ],
+        generationConfig: {
+            temperature: 0.3, // Lower temperature for more consistent, accurate edits
+        },
+    });
+    console.log(result.response.text());
+    return result.response.text();
+}
+
 
 
 //TODOS:
@@ -80,4 +109,4 @@ const enhanceBlog = async (blogText) => {
 //   Integrate DALL·E or Stable Diffusion to generate blog cover images based on the blog’s content.
 //   Perfect for users who don’t have their own graphics.
 
-export { generateAnswer, enhanceBlog, summarizeBlog };
+export { generateAnswer, enhanceBlog, briefTheBlog };
