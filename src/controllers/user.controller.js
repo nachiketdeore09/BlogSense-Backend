@@ -185,16 +185,19 @@ const followUser = asyncHandler(async (req, res) => {
     if (!wantToFollowUser) {
         throw new apiError("User not found");
     }
+    if (req.user.following.includes(wantToFollowUser._id)) {
+        throw new ApiError(400, "Already following this user");
+    }
 
-    req.user.following.push(wantToFollowUser);
-    wantToFollowUser.followers.push(req.user);
+    req.user.following.push(wantToFollowUser._id);
+    wantToFollowUser.followers.push(req.user._id);
 
     await req.user.save({ validateBeforeSave: false });
     await wantToFollowUser.save({ validateBeforeSave: false });
 
     return res
         .status(200)
-        .json(new ApiResponse(200, {}, "successfully following"));
+        .json(new ApiResponse(200, { wantToFollowUser }, "successfully following"));
 })
 
 export {
