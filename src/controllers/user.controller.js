@@ -1,4 +1,5 @@
 import User from '../models/user.model.js';
+import Blog from '../models/blog.model.js';
 import apiError from '../utils/apiError.js';
 import ApiError from '../utils/apiError.js';
 import ApiResponse from '../utils/apiResponse.js';
@@ -200,13 +201,37 @@ const followUser = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, { wantToFollowUser }, "successfully following"));
 })
 
+const getUserFeed = asyncHandler(async (req, res) => {
+
+    if (!req.user) {
+        throw new ApiError(401, "Unauthorized");
+    }
+
+    // Get list of users this user follows
+    const followingIds = req.user.following;
+
+    if (!followingIds || followingIds.length === 0) {
+        return res.status(200).json(new ApiResponse(200, [], "No following, empty feed"));
+    }
+
+    // Fetch blogs by followed users
+    const feedBlogs = await Blog.find({ owner: { $in: followingIds } })
+        .populate("owner", "username fullname avatar") // populate owner details
+        .sort({ createdAt: -1 }); // latest first
+
+    return res.status(200).json(
+        new ApiResponse(200, feedBlogs, "Feed fetched successfully")
+    );
+});
+
 export {
     getUsers,
     registerUser,
     loginUser,
     logOutUser,
     getUserDetails,
-    followUser
+    followUser,
+    getUserFeed
 };
 
 // store the blogs created by a user to its model.

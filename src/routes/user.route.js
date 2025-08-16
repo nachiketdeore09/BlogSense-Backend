@@ -5,7 +5,8 @@ import {
     loginUser,
     logOutUser,
     getUserDetails,
-    followUser
+    followUser,
+    getUserFeed
 } from '../controllers/user.controller.js';
 import { upload } from '../middlewares/multer.middleware.js';
 import { verifyToken } from '../middlewares/auth.middleware.js';
@@ -34,5 +35,6 @@ router.route('/isAuthenticated').get(verifyToken, (req, res) => {
 
 router.route('/getUserDetails').get(verifyToken, getUserDetails);
 router.route('/followUser').post(verifyToken, followUser);
+router.route('/getUserFeed').get(verifyToken, getUserFeed); //not tested yet.
 
 export default router;
